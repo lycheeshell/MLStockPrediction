@@ -57,9 +57,9 @@ def stock_predict(stock, quotes, divide_date):
     print(stock, "涨跌平的预测准确率：", rough_correct_num / y_test.shape[0])
 
     stock_operation(stock_name=stock,
-                    change=change_total[train_days - time_steps:],
-                    close=close_total[train_days - time_steps:],
-                    mean=(turnover_value_total / turnover_vol_total)[train_days - time_steps + 1:],
+                    change=change_total[train_days:],
+                    close=close_total[train_days:],
+                    mean=(turnover_value_total / turnover_vol_total)[train_days + 1:],
                     predict_state=y_predict)
 
     print("结束 :", stock, ", =====================================时间 :", time.ctime())
@@ -145,16 +145,18 @@ def stock_operation(stock_name, change, close, mean, predict_state):
     down_num = 0  # 预测跌正确的天数
     medium_num = 0  # 预测平正确的天数
 
-    for i in range(change.shape[0]):  # 从 第"样本长度sample_len"天起到最后一天，计算金额变化。如：样本长度为5，从第六天开始计算，前五天进行隐状态预测
+    print(predict_state.shape, change.shape, mean.shape)
 
-        if predict_state > 0 and change[i] > 2:
+    for i in range(change.shape[0]):  # 从第一天起到最后一天，计算金额变化
+
+        if predict_state[i] > 0 and change[i] > 2:
             up_num += 1
-        elif predict_state < 0 and change[i] < -2:
+        elif predict_state[i] < 0 and change[i] < -2:
             down_num += 1
-        elif predict_state == 0 and change[i] <= 2 and change[i] >= -2:
+        elif predict_state[i] == 0 and change[i] <= 2 and change[i] >= -2:
             medium_num += 1
 
-        if predict_state > 0 and (not buyed):  # 预测结果不为跌 且 没有持有股票， 买入，手续费0.00032
+        if predict_state[i] > 0 and (not buyed):  # 预测结果不为跌 且 没有持有股票， 买入，手续费0.00032
             buyed = 1
             buy_num += 1
             rate_temp = (mean[i] - close[i - 1]) / close[i - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -162,7 +164,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
             base_money = base_money * (1 + rate_temp)
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00032)
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00032)
-        elif predict_state < 0 and buyed:  # 预测结果为跌 且 持有股票，抛出，手续费0.00132
+        elif predict_state[i] < 0 and buyed:  # 预测结果为跌 且 持有股票，抛出，手续费0.00132
             buyed = 0
             sell_num += 1
             rate_temp = (mean[i] - close[i - 1]) / close[i - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -170,7 +172,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
             base_money = base_money * (1 + rate_temp)
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00132)
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00132)
-        elif predict_state >= 0 and buyed:  # 预测结果为震荡或上涨 且 持有股票，不进行操作
+        elif predict_state[i] >= 0 and buyed:  # 预测结果为震荡或上涨 且 持有股票，不进行操作
             hold_num += 1
             base = base * (1 + change[i] / 100)
             base_money = base_money * (1 + change[i] / 100)
@@ -178,10 +180,12 @@ def stock_operation(stock_name, change, close, mean, predict_state):
             base_money_fee = base_money_fee * (1 + change[i] / 100)
         else:  # 预测结果为跌 且 没有持有股票，不进行操作
             empty_num += 1
+
         model_line.append(base_money)
         model_line_fee.append(base_money_fee)
 
     model_line = np.array(model_line)
+    model_line_fee = np.array(model_line_fee)
 
     print(stock_name, '预测涨正确的天数', up_num)
     print(stock_name, '预测跌正确的天数', down_num)

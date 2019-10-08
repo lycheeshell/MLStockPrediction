@@ -18,7 +18,7 @@ class MLModel:
         model.add(LSTM(units=64))
         model.add(BatchNormalization())
         model.add(Dense(units=1))
-        model.add(Activation('sigmoid'))
+        model.add(Activation('softmax'))
         # add optimizer and loss function
         model.compile(optimizer='adam',loss='mean_squared_error')
         return model
