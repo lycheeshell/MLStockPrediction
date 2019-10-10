@@ -17,10 +17,10 @@ class MLModel:
         model.add(BatchNormalization())
         model.add(LSTM(units=64))
         model.add(BatchNormalization())
-        model.add(Dense(units=1))
+        model.add(Dense(units=5))
         model.add(Activation('softmax'))
         # add optimizer and loss function
-        model.compile(optimizer='adam',loss='mean_squared_error')
+        model.compile(optimizer='adam',loss='mean_squared_error', metrics=['accuracy'])
         return model
 
     def train_model(self, x_train, y_train, epoch=1, batch_size=None):

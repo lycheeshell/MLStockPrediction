@@ -3,71 +3,76 @@ import pandas as pd
 import numpy as np
 import time
 from sklearn.preprocessing import MinMaxScaler
+from keras.utils import np_utils
 import matplotlib.pyplot as plt
 from ml_model import MLModel
 
 
 def stock_predict(stock, quotes, divide_date):
-    print("开始 :", stock, ", 时间 :", time.ctime())
-    quotes = quotes.sort_values(by=['tradeDate'], ascending=True)
-    train_quotes = quotes[quotes['tradeDate'] < divide_date].sort_values(by=['tradeDate'], ascending=True)
+    try:
+        print("开始 :", stock, ", 时间 :", time.ctime())
+        quotes = quotes.sort_values(by=['tradeDate'], ascending=True)
+        train_quotes = quotes[quotes['tradeDate'] < divide_date].sort_values(by=['tradeDate'], ascending=True)
 
-    time_steps = 240  # 每次训练的数据长度，一年大概240个交易日
+        time_steps = 240  # 每次训练的数据长度，一年大概240个交易日
 
-    total_days = len(quotes) - 1
-    train_days = len(train_quotes) - 1  # 减去计算不到涨跌幅的第一天
+        total_days = len(quotes) - 1
+        train_days = len(train_quotes) - 1  # 减去计算不到涨跌幅的第一天
 
-    # 数据
-    close_total = np.array(quotes['closePrice'])
-    change_total = np.zeros(total_days)  # 涨跌幅
-    for i in range(total_days):
-        change_total[i] = (close_total[i + 1] - close_total[i]) / close_total[i] * 100
-    turnover_vol_total = np.array(quotes['turnoverVol'])
-    turnover_value_total = np.array(quotes['turnoverValue']) / 10000
-    negmarket_value_total = np.array(quotes['negMarketValue']) / 1000000
+        # 数据
+        close_total = np.array(quotes['closePrice'])
+        change_total = np.zeros(total_days)  # 涨跌幅
+        for i in range(total_days):
+            change_total[i] = (close_total[i + 1] - close_total[i]) / close_total[i] * 100
+        turnover_vol_total = np.array(quotes['turnoverVol'])
+        turnover_value_total = np.array(quotes['turnoverValue']) / 10000
+        negmarket_value_total = np.array(quotes['negMarketValue']) / 1000000
 
-    x_total, y_total = generate_x_and_y(time_steps, change_total, change_total, turnover_vol_total[1:],
-                                        turnover_value_total[1:],
-                                        negmarket_value_total[1:])
+        x_total, y_total = generate_x_and_y(time_steps, change_total, change_total, turnover_vol_total[1:],
+                                            turnover_value_total[1:],
+                                            negmarket_value_total[1:])
 
-    x_train = x_total[0:train_days - time_steps]
-    y_train = y_total[0:train_days - time_steps]
-    x_test = x_total[train_days - time_steps:]
-    y_test = y_total[train_days - time_steps:]
+        x_train = x_total[0:train_days - time_steps]
+        y_train = y_total[0:train_days - time_steps]
+        x_test = x_total[train_days - time_steps:]
+        y_test = y_total[train_days - time_steps:]
+        y_test = np.argmax(y_test, axis=1) - 2
 
-    # 构建模型
-    model = MLModel(input_shape=[x_train.shape[1], x_train.shape[2]], stock_name=stock)
+        # 构建模型
+        model = MLModel(input_shape=(x_train.shape[1], x_train.shape[2]), stock_name=stock)
 
-    # 训练模型
-    model.train_model(x_train=x_train, y_train=y_train, epoch=5, batch_size=32)
+        # 训练模型
+        model.train_model(x_train=x_train, y_train=y_train, epoch=5, batch_size=32)
 
-    # 预测结果
-    y_predict = model.predict(x_test)
-    y_predict = y_predict.reshape(y_predict.shape[0] * y_predict.shape[1],)
-    print("y_predict: ", y_predict)
+        # 预测结果
+        y_predict = model.predict(x_test)
+        y_predict = np.argmax(y_predict, axis=1) - 2
+        print("y_predict: ", y_predict)
 
-    correct_num = 0
-    rough_correct_num = 0
-    for i in range(y_test.shape[0]):
-        if y_predict[i] == y_test[i]:
-            correct_num += 1
-        if (y_predict[i] > 0 and y_test[i] > 0) or (y_predict[i] < 0 and y_test[i] < 0) or (y_predict[i] == 0 and y_test[i] == 0):
-            rough_correct_num += 1
-    print(stock, "准确的大涨、大跌、震荡、小跌、大跌的预测准确率：", correct_num / y_test.shape[0])
-    print(stock, "涨跌平的预测准确率：", rough_correct_num / y_test.shape[0])
+        correct_num = 0
+        rough_correct_num = 0
+        for i in range(y_test.shape[0]):
+            if y_predict[i] == y_test[i]:
+                correct_num += 1
+            if (y_predict[i] > 0 and y_test[i] > 0) or (y_predict[i] < 0 and y_test[i] < 0) or (y_predict[i] == 0 and y_test[i] == 0):
+                rough_correct_num += 1
+        print(stock, "准确的大涨、大跌、震荡、小跌、大跌的预测准确率：", correct_num / y_test.shape[0])
+        print(stock, "涨跌平的预测准确率：", rough_correct_num / y_test.shape[0])
 
-    stock_operation(stock_name=stock,
-                    change=change_total[train_days:],
-                    close=close_total[train_days:],
-                    mean=(turnover_value_total / turnover_vol_total)[train_days + 1:],
-                    predict_state=y_predict)
+        stock_operation(stock_name=stock,
+                        change=change_total[train_days:],
+                        close=close_total[train_days:],
+                        mean=(turnover_value_total / turnover_vol_total)[train_days + 1:],
+                        predict_state=y_predict)
 
-    print("结束 :", stock, ", =====================================时间 :", time.ctime())
+        print("结束 :", stock, ", =====================================时间 :", time.ctime())
+    except Exception as e:
+        print(e)
 
 
 def generate_x_and_y(time_steps, change, *xs):
-    small_num = 2  # 百分比，( ,-4)大跌， (-4,-2)小跌， (-2,2)震荡， (2,4)小涨， (4, )大涨
-    big_num = 4
+    small_num = 1  # 百分比，( ,-4)大跌， (-4,-2)小跌， (-2,2)震荡， (2,4)小涨， (4, )大涨
+    big_num = 3
 
     data_num = 0  # 参数的个数
 
@@ -99,19 +104,20 @@ def generate_x_and_y(time_steps, change, *xs):
         x.append(x_scaled[i - time_steps: i])
         y_change = change[i]
         if y_change < -big_num:
-            y.append(-2)
-        elif -big_num <= y_change < -small_num:
-            y.append(-1)
-        elif -small_num <= y_change <= small_num:
             y.append(0)
-        elif small_num < y_change <= big_num:
+        elif -big_num <= y_change < -small_num:
             y.append(1)
-        elif y_change > big_num:
+        elif -small_num <= y_change <= small_num:
             y.append(2)
+        elif small_num < y_change <= big_num:
+            y.append(3)
+        elif y_change > big_num:
+            y.append(4)
     # 将数据转化为数组
     x, y = np.array(x), np.array(y)
     # 因为LSTM要求输入的数据格式为三维的，[training_number, time_steps, data_num]，因此对数据进行相应转化
     x = np.reshape(x, (x.shape[0], x.shape[1], data_num))
+    y = np_utils.to_categorical(y, num_classes=5)
 
     return x, y
 
@@ -144,8 +150,6 @@ def stock_operation(stock_name, change, close, mean, predict_state):
     up_num = 0  # 预测涨正确的天数
     down_num = 0  # 预测跌正确的天数
     medium_num = 0  # 预测平正确的天数
-
-    print(predict_state.shape, change.shape, mean.shape)
 
     for i in range(change.shape[0]):  # 从第一天起到最后一天，计算金额变化
 
@@ -196,7 +200,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
     print(stock_name, '最终金额: ', base_money, ' , 最终金额(含交易费): ', base_money_fee)
     print(stock_name, "收益率: ", base - 1, " , 收益率(含交易费): ", base_fee - 1)
 
-    ## 绘制曲线图
+    # 绘制曲线图
     fig = plt.figure()
     plt.plot(close, color='green', label='Real Stock Price')
     plt.plot(model_line, color='red', label='Predicted Without Fee')
@@ -205,7 +209,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
     plt.xlabel(xlabel='Time')
     plt.ylabel(ylabel='Stock Price')
     plt.show()
-    fig.savefig("pictures/lines_" + stock_name + ".jpg")
+    fig.savefig("pictures\\lines_" + stock_name + ".jpg")
 
 
 if __name__ == '__main__':
