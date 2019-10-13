@@ -2,7 +2,7 @@ import multiprocessing
 import pandas as pd
 import numpy as np
 import time
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import scale
 from keras.utils import np_utils
 import matplotlib.pyplot as plt
 from ml_model import MLModel
@@ -62,7 +62,7 @@ def stock_predict(stock, quotes, divide_date):
         stock_operation(stock_name=stock,
                         change=change_total[train_days:],
                         close=close_total[train_days:],
-                        mean=(turnover_value_total / turnover_vol_total)[train_days + 1:],
+                        mean=(turnover_value_total * 10000 / turnover_vol_total)[train_days + 1:],
                         predict_state=y_predict)
 
         print("结束 :", stock, ", =====================================时间 :", time.ctime())
@@ -89,13 +89,14 @@ def generate_x_and_y(time_steps, change, *xs):
         data_num += 1
 
     x_unscaled = np.column_stack(x_list)  # 训练集
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    """
-    fit_transform()对部分数据先拟合fit，
-    找到该part的整体指标，如均值、方差、最大值最小值等等（根据具体转换的目的），
-    然后对该trainData进行转换transform，从而实现数据的标准化、归一化等等。
-    """
-    x_scaled = scaler.fit_transform(X=x_unscaled)
+    # scaler = MinMaxScaler(feature_range=(0, 1))
+    # """
+    # fit_transform()对部分数据先拟合fit，
+    # 找到该part的整体指标，如均值、方差、最大值最小值等等（根据具体转换的目的），
+    # 然后对该trainData进行转换transform，从而实现数据的标准化、归一化等等。
+    # """
+    # x_scaled = scaler.fit_transform(X=x_unscaled)
+    x_scaled = scale(X=x_unscaled, axis=0)
 
     x = []
     y = []
@@ -157,10 +158,10 @@ def stock_operation(stock_name, change, close, mean, predict_state):
             up_num += 1
         elif predict_state[i] < 0 and change[i] < -2:
             down_num += 1
-        elif predict_state[i] == 0 and change[i] <= 2 and change[i] >= -2:
+        elif predict_state[i] == 0 and -2 <= change[i] <= 2:
             medium_num += 1
 
-        if predict_state[i] > 0 and (not buyed):  # 预测结果不为跌 且 没有持有股票， 买入，手续费0.00032
+        if predict_state[i] >= 0 and (not buyed):  # 预测结果不为跌 且 没有持有股票， 买入，手续费0.00032
             buyed = 1
             buy_num += 1
             rate_temp = (mean[i] - close[i - 1]) / close[i - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -209,7 +210,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
     plt.xlabel(xlabel='Time')
     plt.ylabel(ylabel='Stock Price')
     plt.show()
-    fig.savefig("pictures\\lines_" + stock_name + ".jpg")
+    fig.savefig("pictures\\lines_" + stock_name + ".png")
 
 
 if __name__ == '__main__':
@@ -228,7 +229,7 @@ if __name__ == '__main__':
 
     pool = multiprocessing.Pool(processes=2)
 
-    for stock in all_quotes[0:1]:
+    for stock in all_quotes[3:4]:
         quotes = quotes_dataframe[quotes_dataframe['secID'] == stock]
         pool.apply_async(stock_predict, (stock, quotes, divide_date))
 
