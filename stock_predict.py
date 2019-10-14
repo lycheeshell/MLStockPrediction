@@ -73,7 +73,7 @@ def stock_predict(stock, quotes, divide_date):
 def generate_x_and_y(time_steps, change, *xs):
     # ( ,-big_num)大跌， (-big_num,-small_num)小跌， (-small_num,small_num)平， (small_num,big_num)小涨， (big_num, )大涨
     small_num = 0.5
-    big_num = 2
+    big_num = 1.5
 
     data_num = 0  # 参数的个数
 
@@ -135,7 +135,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
     :return:
     """
     base_money = close[0]  # 每天的金额，以第一天的前一天的收盘价为基础金额
-    close = close[1:]
+    # close = close[1:]
     base_money_fee = base_money  # 每天的金额，含手续费计算
     base = 1  # 用来计算收益率
     base_fee = base  # 用来计算含手续费的收益率
@@ -165,7 +165,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
         if predict_state[i] >= 0 and (not buyed):  # 预测结果不为跌 且 没有持有股票， 买入，手续费0.00032
             buyed = 1
             buy_num += 1
-            rate_temp = (mean[i] - close[i - 1]) / close[i - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
+            rate_temp = (mean[i] - close[i]) / close[i]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
             base = base * (1 + rate_temp)
             base_money = base_money * (1 + rate_temp)
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00032)
@@ -173,7 +173,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
         elif predict_state[i] < 0 and buyed:  # 预测结果为跌 且 持有股票，抛出，手续费0.00132
             buyed = 0
             sell_num += 1
-            rate_temp = (mean[i] - close[i - 1]) / close[i - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
+            rate_temp = (mean[i] - close[i]) / close[i]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
             base = base * (1 + rate_temp)
             base_money = base_money * (1 + rate_temp)
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00132)
@@ -230,7 +230,7 @@ if __name__ == '__main__':
 
     pool = multiprocessing.Pool(processes=2)
 
-    for stock in all_quotes[0:1]:
+    for stock in all_quotes[1:2]:
         quotes = quotes_dataframe[quotes_dataframe['secID'] == stock]
         pool.apply_async(stock_predict, (stock, quotes, divide_date))
 

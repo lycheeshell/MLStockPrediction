@@ -1,5 +1,5 @@
 from keras.models import Sequential
-from keras.layers import Dense, LSTM, BatchNormalization, Activation
+from keras.layers import Dense, LSTM, BatchNormalization, Activation, Dropout
 
 
 class MLModel:
@@ -13,17 +13,19 @@ class MLModel:
         # build recurrent neural network
         model = Sequential()
         # return_sequences=True返回的是全部输出
-        model.add(LSTM(units=128, return_sequences=True, input_shape=input_shape))
-        model.add(BatchNormalization())
-        model.add(LSTM(units=64))
-        model.add(BatchNormalization())
+        model.add(LSTM(units=64, input_shape=input_shape))
+        # model.add(LSTM(units=64, return_sequences=True, input_shape=input_shape))
+        model.add(Dropout(0.2))
+        # model.add(LSTM(units=32))
+        # model.add(Dropout(0.2))
         model.add(Dense(units=5))
         model.add(Activation('softmax'))
         # add optimizer and loss function
         model.compile(optimizer='adam',loss='mean_squared_error', metrics=['accuracy'])
+        model.summary()
         return model
 
-    def train_model(self, x_train, y_train, epoch=1, batch_size=None):
+    def train_model(self, x_train, y_train, epoch=3, batch_size=None):
         self.model.fit(x=x_train, y=y_train, epochs=epoch, batch_size=batch_size)
 
     def train_once(self, x_train, y_train):
