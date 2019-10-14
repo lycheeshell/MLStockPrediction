@@ -71,8 +71,9 @@ def stock_predict(stock, quotes, divide_date):
 
 
 def generate_x_and_y(time_steps, change, *xs):
-    small_num = 1  # 百分比，( ,-4)大跌， (-4,-2)小跌， (-2,2)震荡， (2,4)小涨， (4, )大涨
-    big_num = 3
+    # ( ,-big_num)大跌， (-big_num,-small_num)小跌， (-small_num,small_num)平， (small_num,big_num)小涨， (big_num, )大涨
+    small_num = 0.5
+    big_num = 2
 
     data_num = 0  # 参数的个数
 
@@ -229,7 +230,7 @@ if __name__ == '__main__':
 
     pool = multiprocessing.Pool(processes=2)
 
-    for stock in all_quotes[3:4]:
+    for stock in all_quotes[0:1]:
         quotes = quotes_dataframe[quotes_dataframe['secID'] == stock]
         pool.apply_async(stock_predict, (stock, quotes, divide_date))
 

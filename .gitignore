@@ -108,3 +108,5 @@ venv.bak/
 
 xxx.*
 *.h5
+
+export_requirement.py
