@@ -14,7 +14,7 @@ def stock_predict(stock, quotes, divide_date):
         quotes = quotes.sort_values(by=['tradeDate'], ascending=True)
         train_quotes = quotes[quotes['tradeDate'] < divide_date].sort_values(by=['tradeDate'], ascending=True)
 
-        time_steps = 240  # 每次训练的数据长度，一年大概240个交易日
+        time_steps = 20  # 每次训练的数据长度
 
         total_days = len(quotes) - 1
         train_days = len(train_quotes) - 1  # 减去计算不到涨跌幅的第一天
@@ -72,8 +72,8 @@ def stock_predict(stock, quotes, divide_date):
 
 def generate_x_and_y(time_steps, change, *xs):
     # ( ,-big_num)大跌， (-big_num,-small_num)小跌， (-small_num,small_num)平， (small_num,big_num)小涨， (big_num, )大涨
-    small_num = 0.5
-    big_num = 1.5
+    small_num = 0.4
+    big_num = 1.2
 
     data_num = 0  # 参数的个数
 
@@ -97,7 +97,7 @@ def generate_x_and_y(time_steps, change, *xs):
     # 然后对该trainData进行转换transform，从而实现数据的标准化、归一化等等。
     # """
     # x_scaled = scaler.fit_transform(X=x_unscaled)
-    x_scaled = scale(X=x_unscaled, axis=0)
+    x_scaled = scale(X=x_unscaled, axis=0)  # 归一化
 
     x = []
     y = []
@@ -134,6 +134,13 @@ def stock_operation(stock_name, change, close, mean, predict_state):
     :param predict_state: 预测的每一天的状态
     :return:
     """
+    if change.shape[0] != mean.shape[0]:
+        print("change 和 mean 长度不一致")
+        return
+    if close.shape[0] - 1 != change.shape[0]:
+        print("close - 1 和 change 长度不一致")
+        return
+
     base_money = close[0]  # 每天的金额，以第一天的前一天的收盘价为基础金额
     # close = close[1:]
     base_money_fee = base_money  # 每天的金额，含手续费计算
@@ -230,7 +237,7 @@ if __name__ == '__main__':
 
     pool = multiprocessing.Pool(processes=2)
 
-    for stock in all_quotes[1:2]:
+    for stock in all_quotes[3:4]:
         quotes = quotes_dataframe[quotes_dataframe['secID'] == stock]
         pool.apply_async(stock_predict, (stock, quotes, divide_date))
 
