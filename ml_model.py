@@ -18,18 +18,15 @@ class MLModel:
         model.add(Dropout(0.2))
         # model.add(LSTM(units=32))
         # model.add(Dropout(0.2))
-        model.add(Dense(units=5))
+        model.add(Dense(units=3))
         model.add(Activation('softmax'))
         # add optimizer and loss function
         model.compile(optimizer='adam',loss='mean_squared_error', metrics=['accuracy'])
-        model.summary()
+        # model.summary()
         return model
 
     def train_model(self, x_train, y_train, epoch=3, batch_size=None):
         self.model.fit(x=x_train, y=y_train, epochs=epoch, batch_size=batch_size)
-
-    def train_once(self, x_train, y_train):
-        self.model.fit(x=x_train, y=y_train)
 
     def predict(self, x_test):
         y_predict = self.model.predict(x_test, batch_size=32)
