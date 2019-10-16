@@ -11,7 +11,13 @@ with codecs.open('token.txt', 'rb', 'utf-8') as f:
 ts.set_token(token)
 pro = ts.pro_api()
 
-stock = '000905.SH'  # 399300.SZ   000905.SH
+"""
+generate_x_and_y方法的调参
+对于中证500 '000905.SH'，small_num=0.4 , big_num=1.2
+对于沪深300 '399300.SZ'，small_num=0.2 , big_num=0.72
+"""
+
+stock = '399300.SZ'  # 399300.SZ   000905.SH
 divide_date = '20190101'
 
 quotes = pro.index_daily(ts_code=stock, start_date='20090101')
@@ -20,20 +26,23 @@ print("开始 :", stock, ", 时间 :", time.ctime())
 quotes = quotes.sort_values(by=['trade_date'], ascending=True)
 train_quotes = quotes[quotes['trade_date'] < divide_date].sort_values(by=['trade_date'], ascending=True)
 
-time_steps = 20  # 每次训练的数据长度
+time_steps = 5  # 每次训练的数据长度
 
 total_days = len(quotes)
 train_days = len(train_quotes)
 
 # 数据
 close_total = np.array(quotes['close'])
+open_total = np.array(quotes['open'])
+high_total = np.array(quotes['high'])
+low_total = np.array(quotes['low'])
 change_total = np.array(quotes['pct_chg'])
 turnover_vol_total = np.array(quotes['vol'])
 turnover_value_total = np.array(quotes['amount'])
 mean_total = (np.array(quotes['high']) + np.array(quotes['low'])) / 2
 
 x_total, y_total = stock_predict.generate_x_and_y(time_steps, change_total,
-                                                  change_total, close_total, turnover_vol_total, turnover_value_total)
+                                                  change_total, open_total, close_total, high_total, low_total, turnover_value_total)
 
 x_train = x_total[0:train_days - time_steps]
 y_train = y_total[0:train_days - time_steps]

@@ -14,7 +14,7 @@ def stock_predict(stock, quotes, divide_date):
         quotes = quotes.sort_values(by=['tradeDate'], ascending=True)
         train_quotes = quotes[quotes['tradeDate'] < divide_date].sort_values(by=['tradeDate'], ascending=True)
 
-        time_steps = 20  # 每次训练的数据长度
+        time_steps = 5  # 每次训练的数据长度
 
         total_days = len(quotes) - 1
         train_days = len(train_quotes) - 1  # 减去计算不到涨跌幅的第一天
@@ -72,8 +72,8 @@ def stock_predict(stock, quotes, divide_date):
 
 def generate_x_and_y(time_steps, change, *xs):
     # ( ,-big_num)大跌， (-big_num,-small_num)小跌， (-small_num,small_num)平， (small_num,big_num)小涨， (big_num, )大涨
-    small_num = 0.4
-    big_num = 1.2
+    small_num = 0.2
+    big_num = 0.72
 
     data_num = 0  # 参数的个数
 
@@ -124,6 +124,55 @@ def generate_x_and_y(time_steps, change, *xs):
     return x, y
 
 
+def generate_x_and_y_3(time_steps, change, *xs):
+    # ( ,-big_num)大跌， (-big_num,-small_num)小跌， (-small_num,small_num)平， (small_num,big_num)小涨， (big_num, )大涨
+    big_num = 0.3
+
+    data_num = 0  # 参数的个数
+
+    if len(xs) < 1:
+        print('error: 没有传入参数XS！！！')
+        return
+    x_len = len(change)
+    x_list = []
+    for x_temp in xs:
+        if len(x_temp) != x_len:
+            print('error: XS参数长度不相等！！！')
+            return
+        x_list.append(x_temp)
+        data_num += 1
+
+    x_unscaled = np.column_stack(x_list)  # 训练集
+    # scaler = MinMaxScaler(feature_range=(0, 1))
+    # """
+    # fit_transform()对部分数据先拟合fit，
+    # 找到该part的整体指标，如均值、方差、最大值最小值等等（根据具体转换的目的），
+    # 然后对该trainData进行转换transform，从而实现数据的标准化、归一化等等。
+    # """
+    # x_scaled = scaler.fit_transform(X=x_unscaled)
+    x_scaled = scale(X=x_unscaled, axis=0)  # 归一化
+
+    x = []
+    y = []
+    # 每240个数据为一组，作为测试数据，下一个数据为标签
+    for i in range(time_steps, x_scaled.shape[0]):
+        x.append(x_scaled[i - time_steps: i])
+        y_change = change[i]
+        if y_change < -big_num:
+            y.append(0)
+        elif -big_num <= y_change <= big_num:
+            y.append(1)
+        elif y_change > big_num:
+            y.append(2)
+    # 将数据转化为数组
+    x, y = np.array(x), np.array(y)
+    # 因为LSTM要求输入的数据格式为三维的，[training_number, time_steps, data_num]，因此对数据进行相应转化
+    x = np.reshape(x, (x.shape[0], x.shape[1], data_num))
+    y = np_utils.to_categorical(y, num_classes=3)
+
+    return x, y
+
+
 def stock_operation(stock_name, change, close, mean, predict_state):
     """
     股票买卖的操作，最后绘制走势图
@@ -162,14 +211,14 @@ def stock_operation(stock_name, change, close, mean, predict_state):
 
     for i in range(change.shape[0]):  # 从第一天起到最后一天，计算金额变化
 
-        if predict_state[i] > 0 and change[i] > 2:
+        if predict_state[i] > 0 and change[i] > 1:
             up_num += 1
-        elif predict_state[i] < 0 and change[i] < -2:
+        elif predict_state[i] < 0 and change[i] < -1:
             down_num += 1
-        elif predict_state[i] == 0 and -2 <= change[i] <= 2:
+        elif predict_state[i] == 0 and -1 <= change[i] <= 1:
             medium_num += 1
 
-        if predict_state[i] >= 0 and (not buyed):  # 预测结果不为跌 且 没有持有股票， 买入，手续费0.00032
+        if predict_state[i] >= 0 and (not buyed):  # 预测结果涨 且 没有持有股票， 买入，手续费0.00032
             buyed = 1
             buy_num += 1
             rate_temp = (mean[i] - close[i]) / close[i]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -177,7 +226,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
             base_money = base_money * (1 + rate_temp)
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00032)
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00032)
-        elif predict_state[i] < 0 and buyed:  # 预测结果为跌 且 持有股票，抛出，手续费0.00132
+        elif predict_state[i] < 0 and buyed:  # 预测结果为平或跌 且 持有股票，抛出，手续费0.00132
             buyed = 0
             sell_num += 1
             rate_temp = (mean[i] - close[i]) / close[i]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -185,7 +234,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
             base_money = base_money * (1 + rate_temp)
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00132)
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00132)
-        elif predict_state[i] >= 0 and buyed:  # 预测结果为震荡或上涨 且 持有股票，不进行操作
+        elif predict_state[i] >= 0 and buyed:  # 预测结果为涨 且 持有股票，不进行操作
             hold_num += 1
             base = base * (1 + change[i] / 100)
             base_money = base_money * (1 + change[i] / 100)
@@ -217,6 +266,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
     plt.title(label='Stock Prediction')
     plt.xlabel(xlabel='Time')
     plt.ylabel(ylabel='Stock Price')
+    plt.legend(loc='upper left')
     plt.show()
     fig.savefig("pictures\\lines_" + stock_name + ".png")
 

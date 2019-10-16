@@ -106,7 +106,7 @@ venv.bak/
 #idea
 .idea/*
 
-xxx.*
+xxx*.*
 *.h5
 token.txt
 export_requirement.py
