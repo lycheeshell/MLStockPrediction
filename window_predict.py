@@ -1,6 +1,7 @@
 # coding=utf-8
 import numpy as np
 import tushare as ts
+import talib as ta
 import time
 import logging
 import os
@@ -71,6 +72,11 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
     actual_down_num = 0  # 跌的天数
     actual_medium_num = 0  # 平的天数
 
+    predict_up_num_2 = 0
+    predict_down_num_2 = 0
+    actual_up_num_2 = 0
+    actual_down_num_2 = 0
+
     predict_result = []
     actual_result = []
 
@@ -102,6 +108,11 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
 
         predict_result.append(predict_state)
 
+        if change[i + window_len] >= 0:
+            actual_up_num_2 += 1
+        else:
+            actual_down_num_2 += 1
+
         if actual_state > 0:
             actual_up_num += 1
             if predict_state > 0:
@@ -115,8 +126,9 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
             if predict_state == 0:
                 medium_num += 1
 
-        if predict_state >= 0 and (not buyed):  # 预测结果涨 且 没有持有股票， 买入，手续费0.00032
+        if predict_state > 0 and (not buyed):  # 预测结果涨 且 没有持有股票， 买入，手续费0.00032
             buyed = 1
+            predict_up_num_2 += 1
             buy_num += 1
             rate_temp = (mean[i + window_len] - close[i + window_len - 1]) / close[
                 i + window_len - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -126,6 +138,7 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00032)
         elif predict_state < 0 and buyed:  # 预测结果为跌 且 持有股票，抛出，手续费0.00132
             buyed = 0
+            predict_down_num_2 += 1
             sell_num += 1
             rate_temp = (mean[i + window_len] - close[i + window_len - 1]) / close[
                 i + window_len - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -134,12 +147,14 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00132)
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00132)
         elif predict_state >= 0 and buyed:  # 预测结果为涨 且 持有股票，不进行操作
+            predict_up_num_2 += 1
             hold_num += 1
             base = base * (1 + change[i + window_len] / 100)
             base_money = base_money * (1 + change[i + window_len] / 100)
             base_fee = base_fee * (1 + change[i + window_len] / 100)
             base_money_fee = base_money_fee * (1 + change[i + window_len] / 100)
         else:  # 预测结果为跌 且 没有持有股票，不进行操作
+            predict_down_num_2 += 1
             empty_num += 1
 
         model_line.append(base_money)
@@ -163,6 +178,9 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
     logging.info(stock + '预测涨正确的比例' + str(up_num / actual_up_num * 100) + '%')
     logging.info(stock + '预测跌正确的比例' + str(down_num / actual_down_num * 100) + '%')
     logging.info(stock + '预测平正确的比例' + str(medium_num / actual_medium_num * 100) + '%')
+
+    logging.info(stock + '操作涨正确的比例' + str(predict_up_num_2 / actual_up_num_2 * 100) + '%')
+    logging.info(stock + '操作跌正确的比例' + str(predict_down_num_2 / actual_down_num_2 * 100) + '%')
 
     logging.info(stock + '总天数:' + str(close.shape[0] - window_len) + ',买入天数: ' + str(buy_num) + ',卖出天数: ' + str(
         sell_num) + ',持有天数: ' + str(hold_num) + ',空仓天数: ' + str(empty_num))
@@ -268,7 +286,7 @@ def window_back(stock, window_len, time_steps, flat_num, close, change, mean, pr
             if predict_state[i] == 0:
                 medium_num += 1
 
-        if predict_state[i] > 0and (not buyed):
+        if predict_state[i] > 0 and (not buyed):
             # 预测结果涨 且 没有持有股票， 买入，手续费0.00032
             buyed = 1
             buy_num += 1
@@ -278,7 +296,7 @@ def window_back(stock, window_len, time_steps, flat_num, close, change, mean, pr
             base_money = base_money * (1 + rate_temp)
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00032)
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00032)
-        elif predict_state[i] <= 0and buyed:
+        elif predict_state[i] < 0 and buyed:
             # 预测结果为跌 且 持有股票，抛出，手续费0.00132
             buyed = 0
             sell_num += 1
@@ -288,7 +306,7 @@ def window_back(stock, window_len, time_steps, flat_num, close, change, mean, pr
             base_money = base_money * (1 + rate_temp)
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00132)
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00132)
-        elif predict_state[i] > 0 and buyed:
+        elif predict_state[i] >= 0 and buyed:
             # 预测结果为涨 且 持有股票，不进行操作
             hold_num += 1
             base = base * (1 + change[i + window_len] / 100)
@@ -343,14 +361,13 @@ if __name__ == '__main__':
     pro = ts.pro_api()
 
     # 参数
-    stock = '399300.SZ'  # 399300.SZ   000905.SH
+    stock = '000905.SH'  # 399300.SZ   000905.SH
     window_len = 20  # 窗口的长度
-    time_steps = 3  # 每次训练的数据长度
+    time_steps = 5  # 每次训练的数据长度
     flat_num = 0.4  # (-flat_num, flat_num) 平
 
     quotes = pro.index_daily(ts_code=stock, start_date='20190301').sort_values(by=['trade_date'], ascending=True)
 
-    # 数据ema5 ema10 穿越 macd (diff   kdj  bulling线
     close_total = np.array(quotes['close'])
     open_total = np.array(quotes['open'])
     high_total = np.array(quotes['high'])
@@ -360,21 +377,30 @@ if __name__ == '__main__':
     turnover_value_total = np.array(quotes['amount'])
     mean_total = (np.array(quotes['high']) + np.array(quotes['low'])) / 2  # 均价
 
-    data_list = [open_total, close_total, high_total, low_total, turnover_value_total]
+    # 数据ema5 ema10 穿越 macd rsi (diff   kdj  布林线
+    # 金融数据指标
+    ema_num = 10
+    boll_num = 20
+    ema = ta.EMA(quotes['close'], ema_num).values
+    H_line, M_line, L_line = ta.BBANDS(quotes['close'], timeperiod=boll_num, nbdevup=2, nbdevdn=2, matype=0)
+
+    data_list = [ema[boll_num - 1:], H_line[boll_num - 1:], M_line[boll_num - 1:], L_line[boll_num - 1:],
+                 turnover_vol_total[boll_num - 1:]]
     data_unscaled = np.column_stack(data_list)
     data_scaled = scale(X=data_unscaled, axis=0)  # 归一化
 
     # 回测，减少时间
-    # predict_result = [-1, -1, -1, 0, 1, 0, 1, 0, 0, 0, -1, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 1,
-    #                   1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, -1,
-    #                   1, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1, 0]
-    # actual_result = [0, 0, 0, 1, 0, -1, 0, -1, 1, -1, 0, 1, 1, 0, 0, 0, -1, -1, -1, -1, -1, 0, 1, -1,
-    #                  1, -1, 1, 0, 0, 1, 0, 0, 0, 1, -1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, -1, 1,
-    #                  0, -1, 1, 0, 0, -1, 0, -1, -1, 0, -1, 1, 0, 1, 1, 1, 0, 0]
+    # predict_result = [1, 1, 1, -1, 0, 0, -1, 0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1,
+    #                   -1, -1, -1, 1, 1, -1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, -1, 0, 0, 0, 0,
+    #                   0, 0, 0, -1, -1, -1, -1, 1, 1, 1, 1, -1, -1, -1, -1, 1, -1, 1, 1]
+    # actual_result = [1, 0, -1, 0, 0, -1, 0, -1, 0, 0, 1, 0, 0, -1, 1, -1, 1, 1, 0, 0, 0, 1, -1, -1, -1, -1, -1, -1, 1,
+    #                  -1, 1, -1, 1, 1, 0, 1, 0, 0, 0, 0, -1, 1, 0, 0, -1, 1, 1, 1, 1, 0, 1, 0, -1, 1, 0, -1, 0, 1, 0, -1,
+    #                  0, -1, -1, 1, -1, 0, 1, 1, 0, 1, -1, -1, 0, -1, 0, 1, -1, 0, 1, 1]
     # window_back(stock=stock, window_len=window_len, time_steps=time_steps, flat_num=flat_num,
-    #             close=close_total, change=change_total, mean=mean_total,
+    #             close=close_total[boll_num - 1:], change=change_total[boll_num - 1:], mean=mean_total[boll_num - 1:],
     #             predict_state=predict_result, actual_state=actual_result)
     # exit()
 
     window_predict(stock=stock, window_len=window_len, time_steps=time_steps, flat_num=flat_num,
-                   close=close_total, change=change_total, mean=mean_total, data=data_scaled)
+                   close=close_total[boll_num - 1:], change=change_total[boll_num - 1:], mean=mean_total[boll_num - 1:],
+                   data=data_scaled)
