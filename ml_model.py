@@ -1,5 +1,6 @@
 from keras.models import Sequential
-from keras.layers import Dense, LSTM, BatchNormalization, Activation, Dropout
+from keras.layers import Dense, LSTM, Activation, Dropout, Convolution2D, MaxPooling2D, Flatten
+from keras.optimizers import Adam
 
 
 class MLModel:
@@ -20,7 +21,8 @@ class MLModel:
         model.add(Dense(units=3))
         model.add(Activation('softmax'))
         # add optimizer and loss function
-        model.compile(optimizer='adam',loss='mean_squared_error', metrics=['accuracy'])
+        adam = Adam(lr=1e-3)
+        model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
         # model.summary()
         return model
 

@@ -1,13 +1,14 @@
 import numpy as np
 import tushare as ts
-import codecs
+import talib as ta
 import time
 from ml_model import MLModel
 import stock_predict
 
 # 导入金融数据
-with codecs.open('token.txt', 'rb', 'utf-8') as f:
-    token = f.read()
+f = open("token.txt", "r")
+token = f.read()
+f.close()
 ts.set_token(token)
 pro = ts.pro_api()
 
@@ -28,9 +29,6 @@ train_quotes = quotes[quotes['trade_date'] < divide_date].sort_values(by=['trade
 
 time_steps = 5  # 每次训练的数据长度
 
-total_days = len(quotes)
-train_days = len(train_quotes)
-
 # 数据
 close_total = np.array(quotes['close'])
 open_total = np.array(quotes['open'])
@@ -41,24 +39,35 @@ turnover_vol_total = np.array(quotes['vol'])
 turnover_value_total = np.array(quotes['amount'])
 mean_total = (np.array(quotes['high']) + np.array(quotes['low'])) / 2
 
-x_total, y_total = stock_predict.generate_x_and_y(time_steps, change_total,
-                                                  change_total, open_total, close_total, high_total, low_total, turnover_value_total)
+# 数据ema5 ema10 穿越 macd rsi (diff   kdj  布林线
+# 金融数据指标
+ema_num = 10
+boll_num = 20
+ema = ta.EMA(quotes['close'], ema_num).values
+H_line, M_line, L_line = ta.BBANDS(quotes['close'], timeperiod=boll_num, nbdevup=2, nbdevdn=2, matype=0)
+
+x_total, y_total = stock_predict.generate_x_and_y_3(time_steps, change_total[boll_num - 1:],
+                                                    ema[boll_num - 1:], H_line[boll_num - 1:], M_line[boll_num - 1:], L_line[boll_num - 1:], turnover_vol_total[boll_num - 1:])
+
+total_days = len(quotes) - boll_num
+train_days = len(train_quotes) - boll_num
+
 
 x_train = x_total[0:train_days - time_steps]
 y_train = y_total[0:train_days - time_steps]
 x_test = x_total[train_days - time_steps:]
 y_test = y_total[train_days - time_steps:]
-y_test = np.argmax(y_test, axis=1) - 2
+y_test = np.argmax(y_test, axis=1) - 1
 
 # 构建模型
 model = MLModel(input_shape=(x_train.shape[1], x_train.shape[2]), stock_name=stock)
 
 # 训练模型
-model.train_model(x_train=x_train, y_train=y_train, epoch=5, batch_size=32)
+model.train_model(x_train=x_train, y_train=y_train, epoch=10, batch_size=32)
 
 # 预测结果
 y_predict = model.predict(x_test)
-y_predict = np.argmax(y_predict, axis=1) - 2
+y_predict = np.argmax(y_predict, axis=1) - 1
 print("y_predict: ", y_predict)
 
 correct_num = 0
@@ -73,9 +82,9 @@ print(stock, "准确的大涨、大跌、震荡、小跌、大跌的预测准确
 print(stock, "涨跌平的预测准确率：", rough_correct_num / y_test.shape[0])
 
 stock_predict.stock_operation(stock_name=stock,
-                              change=change_total[train_days:],
-                              close=close_total[train_days - 1:],
-                              mean=mean_total[train_days:],
+                              change=change_total[train_days + boll_num:],
+                              close=close_total[train_days + boll_num - 1:],
+                              mean=mean_total[train_days + boll_num:],
                               predict_state=y_predict)
 
 print("结束 :", stock, ", =====================================时间 :", time.ctime())

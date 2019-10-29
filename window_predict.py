@@ -99,7 +99,7 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
         model = MLModel(input_shape=(x_train.shape[1], x_train.shape[2]), stock_name=stock)
 
         # 训练模型
-        model.train_model(x_train=x_train, y_train=y_train, epoch=5, batch_size=4, verbose=0)  # verbose=0不显示训练过程
+        model.train_model(x_train=x_train, y_train=y_train, epoch=10, batch_size=4, verbose=0)  # verbose=0不显示训练过程
 
         # 预测结果
         y_predict = model.predict(x_test)
@@ -110,8 +110,12 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
 
         if change[i + window_len] >= 0:
             actual_up_num_2 += 1
+            if (predict_state > 0 and (not buyed)) or (predict_state >= 0 and buyed) :
+                predict_up_num_2 += 1
         else:
             actual_down_num_2 += 1
+            if (predict_state < 0 and buyed) or (predict_state <= 0 and not buyed):
+                predict_down_num_2 += 1
 
         if actual_state > 0:
             actual_up_num += 1
@@ -128,7 +132,6 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
 
         if predict_state > 0 and (not buyed):  # 预测结果涨 且 没有持有股票， 买入，手续费0.00032
             buyed = 1
-            predict_up_num_2 += 1
             buy_num += 1
             rate_temp = (mean[i + window_len] - close[i + window_len - 1]) / close[
                 i + window_len - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -138,7 +141,6 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00032)
         elif predict_state < 0 and buyed:  # 预测结果为跌 且 持有股票，抛出，手续费0.00132
             buyed = 0
-            predict_down_num_2 += 1
             sell_num += 1
             rate_temp = (mean[i + window_len] - close[i + window_len - 1]) / close[
                 i + window_len - 1]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
@@ -147,14 +149,12 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
             base_fee = base_fee * (1 + rate_temp) * (1 - 0.00132)
             base_money_fee = base_money_fee * (1 + rate_temp) * (1 - 0.00132)
         elif predict_state >= 0 and buyed:  # 预测结果为涨 且 持有股票，不进行操作
-            predict_up_num_2 += 1
             hold_num += 1
             base = base * (1 + change[i + window_len] / 100)
             base_money = base_money * (1 + change[i + window_len] / 100)
             base_fee = base_fee * (1 + change[i + window_len] / 100)
             base_money_fee = base_money_fee * (1 + change[i + window_len] / 100)
         else:  # 预测结果为跌 且 没有持有股票，不进行操作
-            predict_down_num_2 += 1
             empty_num += 1
 
         model_line.append(base_money)
@@ -189,7 +189,7 @@ def window_predict(stock, window_len, time_steps, flat_num, close, change, mean,
     logging.info(stock + "收益率: " + str(base - 1) + " , 收益率(含交易费): " + str(base_fee - 1))
 
     program_end_time = time.time()
-    logging.info('程序总用时:' + str(program_end_time - program_start_time) + '秒')
+    logging.info('程序总用时:' + str((program_end_time - program_start_time) / 60) + '分钟')
 
     # 绘制曲线图
     fig = plt.figure()
@@ -361,9 +361,9 @@ if __name__ == '__main__':
     pro = ts.pro_api()
 
     # 参数
-    stock = '000905.SH'  # 399300.SZ   000905.SH
+    stock = '399300.SZ'  # 399300.SZ   000905.SH
     window_len = 20  # 窗口的长度
-    time_steps = 5  # 每次训练的数据长度
+    time_steps = 3  # 每次训练的数据长度
     flat_num = 0.4  # (-flat_num, flat_num) 平
 
     quotes = pro.index_daily(ts_code=stock, start_date='20190301').sort_values(by=['trade_date'], ascending=True)
@@ -379,13 +379,13 @@ if __name__ == '__main__':
 
     # 数据ema5 ema10 穿越 macd rsi (diff   kdj  布林线
     # 金融数据指标
-    ema_num = 10
+    ema_num = 5
     boll_num = 20
     ema = ta.EMA(quotes['close'], ema_num).values
     H_line, M_line, L_line = ta.BBANDS(quotes['close'], timeperiod=boll_num, nbdevup=2, nbdevdn=2, matype=0)
 
     data_list = [ema[boll_num - 1:], H_line[boll_num - 1:], M_line[boll_num - 1:], L_line[boll_num - 1:],
-                 turnover_vol_total[boll_num - 1:]]
+                 close_total[boll_num - 1:], turnover_vol_total[boll_num - 1:]]
     data_unscaled = np.column_stack(data_list)
     data_scaled = scale(X=data_unscaled, axis=0)  # 归一化
 

@@ -124,53 +124,46 @@ def generate_x_and_y(time_steps, change, *xs):
     return x, y
 
 
-# def generate_x_and_y_3(time_steps, change, *xs):
-#     # ( ,-big_num)大跌， (-big_num,-small_num)小跌， (-small_num,small_num)平， (small_num,big_num)小涨， (big_num, )大涨
-#     big_num = 0.3
-#
-#     data_num = 0  # 参数的个数
-#
-#     if len(xs) < 1:
-#         print('error: 没有传入参数XS！！！')
-#         return
-#     x_len = len(change)
-#     x_list = []
-#     for x_temp in xs:
-#         if len(x_temp) != x_len:
-#             print('error: XS参数长度不相等！！！')
-#             return
-#         x_list.append(x_temp)
-#         data_num += 1
-#
-#     x_unscaled = np.column_stack(x_list)  # 训练集
-#     # scaler = MinMaxScaler(feature_range=(0, 1))
-#     # """
-#     # fit_transform()对部分数据先拟合fit，
-#     # 找到该part的整体指标，如均值、方差、最大值最小值等等（根据具体转换的目的），
-#     # 然后对该trainData进行转换transform，从而实现数据的标准化、归一化等等。
-#     # """
-#     # x_scaled = scaler.fit_transform(X=x_unscaled)
-#     x_scaled = scale(X=x_unscaled, axis=0)  # 归一化
-#
-#     x = []
-#     y = []
-#     # 每240个数据为一组，作为测试数据，下一个数据为标签
-#     for i in range(time_steps, x_scaled.shape[0]):
-#         x.append(x_scaled[i - time_steps: i])
-#         y_change = change[i]
-#         if y_change < -big_num:
-#             y.append(0)
-#         elif -big_num <= y_change <= big_num:
-#             y.append(1)
-#         elif y_change > big_num:
-#             y.append(2)
-#     # 将数据转化为数组
-#     x, y = np.array(x), np.array(y)
-#     # 因为LSTM要求输入的数据格式为三维的，[training_number, time_steps, data_num]，因此对数据进行相应转化
-#     x = np.reshape(x, (x.shape[0], x.shape[1], data_num))
-#     y = np_utils.to_categorical(y, num_classes=3)
-#
-#     return x, y
+def generate_x_and_y_3(time_steps, change, *xs):
+    # ( ,-big_num)大跌， (-big_num,-small_num)小跌， (-small_num,small_num)平， (small_num,big_num)小涨， (big_num, )大涨
+    big_num = 0.38
+
+    data_num = 0  # 参数的个数
+
+    if len(xs) < 1:
+        print('error: 没有传入参数XS！！！')
+        return
+    x_len = len(change)
+    x_list = []
+    for x_temp in xs:
+        if len(x_temp) != x_len:
+            print('error: XS参数长度不相等！！！')
+            return
+        x_list.append(x_temp)
+        data_num += 1
+
+    x_unscaled = np.column_stack(x_list)  # 训练集
+    x_scaled = scale(X=x_unscaled, axis=0)  # 归一化
+
+    x = []
+    y = []
+    # 每time_steps个数据为一组，作为测试数据，下一个数据为标签
+    for i in range(time_steps, x_scaled.shape[0]):
+        x.append(x_scaled[i - time_steps: i])
+        y_change = change[i]
+        if y_change < -big_num:
+            y.append(0)
+        elif -big_num <= y_change <= big_num:
+            y.append(1)
+        elif y_change > big_num:
+            y.append(2)
+    # 将数据转化为数组
+    x, y = np.array(x), np.array(y)
+    # 因为LSTM要求输入的数据格式为三维的，[training_number, time_steps, data_num]，因此对数据进行相应转化
+    x = np.reshape(x, (x.shape[0], x.shape[1], data_num))
+    y = np_utils.to_categorical(y, num_classes=3)
+
+    return x, y
 
 
 def stock_operation(stock_name, change, close, mean, predict_state):
@@ -218,7 +211,7 @@ def stock_operation(stock_name, change, close, mean, predict_state):
         elif predict_state[i] == 0 and -1 <= change[i] <= 1:
             medium_num += 1
 
-        if predict_state[i] >= 0 and (not buyed):  # 预测结果涨 且 没有持有股票， 买入，手续费0.00032
+        if predict_state[i] > 0 and (not buyed):  # 预测结果涨 且 没有持有股票， 买入，手续费0.00032
             buyed = 1
             buy_num += 1
             rate_temp = (mean[i] - close[i]) / close[i]  # 基于第二天股票均价相对于第一天收盘价的涨跌幅
