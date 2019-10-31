@@ -1,5 +1,5 @@
 from keras.models import Sequential
-from keras.layers import Dense, LSTM, Activation, Dropout, Convolution2D, MaxPooling2D, Flatten
+from keras.layers import Dense, LSTM, Activation, Dropout, Convolution1D, MaxPooling1D, Flatten
 from keras.optimizers import Adam
 
 
@@ -14,7 +14,21 @@ class MLModel:
         # build recurrent neural network
         model = Sequential()
         # return_sequences=True返回的是全部输出
-        model.add(LSTM(units=64, input_shape=input_shape))
+        model.add(Convolution1D(
+            input_shape=input_shape,
+            filters=32,
+            kernel_size=5,
+            strides=1,
+            padding='same',  # Padding method
+            data_format='channels_first',
+        ))
+        model.add(MaxPooling1D(
+            pool_size=2,
+            strides=2,
+            padding='same',  # Padding method
+            data_format='channels_first',
+        ))
+        model.add(LSTM(units=64))
         # model.add(BatchNormalization())
         # model.add(LSTM(units=64, return_sequences=True, input_shape=input_shape))
         # model.add(Dropout(0.2))

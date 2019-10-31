@@ -361,7 +361,7 @@ if __name__ == '__main__':
     pro = ts.pro_api()
 
     # 参数
-    stock = '399300.SZ'  # 399300.SZ   000905.SH
+    stock = '000905.SH'  # 399300.SZ   000905.SH
     window_len = 20  # 窗口的长度
     time_steps = 3  # 每次训练的数据长度
     flat_num = 0.4  # (-flat_num, flat_num) 平
