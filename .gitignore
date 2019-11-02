@@ -111,4 +111,5 @@ xxx*.*
 token.txt
 export_requirement.py
 pictures/*
+*.png
 logs/*
