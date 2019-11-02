@@ -109,7 +109,6 @@ venv.bak/
 xxx*.*
 *.h5
 token.txt
-export_requirement.py
 pictures/*
 *.png
 logs/*

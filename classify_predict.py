@@ -73,13 +73,11 @@ def classify_predict(stock, time_steps, close, change, mean, data, state, back_l
     actual_down_num = 0  # 跌的天数
     actual_medium_num = 0  # 平的天数
 
-    predict_up_num_2 = 0
-    predict_down_num_2 = 0
-    actual_up_num_2 = 0
-    actual_down_num_2 = 0
-
     predict_result = []
     actual_result = []
+
+    existed_state_list = []
+    existed_model = []
 
     for i in range(back_len):  # 窗口滑动，计算金额变化
 
@@ -93,13 +91,30 @@ def classify_predict(stock, time_steps, close, change, mean, data, state, back_l
         actual_state = y_actual - 1
         actual_result.append(actual_state)
 
-        x_train, y_train = generate_x_and_y_3(data=data[0:total_len-back_len], state_list=state_list, state=state[0:total_len-back_len])
+        model = None
 
-        # 构建模型
-        model = MLModel(input_shape=(x_train.shape[1], x_train.shape[2]), stock_name=stock)
+        for k in range(len(existed_state_list)):
+            li = existed_state_list[k]
+            all_same = 1
+            for j in range(time_steps):
+                if li[j] != state_list[j]:
+                    all_same = 0
+                    break
+            if all_same:
+                model = existed_model[k]
+                break
 
-        # 训练模型
-        model.train_model(x_train=x_train, y_train=y_train, epoch=10, batch_size=4, verbose=0)  # verbose=0不显示训练过程
+        if model is None:
+            x_train, y_train = generate_x_and_y_3(data=data[0:total_len-back_len], state_list=state_list, state=state[0:total_len-back_len])
+
+            # 构建模型
+            model = MLModel(input_shape=(x_train.shape[1], x_train.shape[2]), stock_name=stock)
+
+            # 训练模型
+            model.train_model(x_train=x_train, y_train=y_train, epoch=10, batch_size=4, verbose=0)  # verbose=0不显示训练过程
+
+            existed_model.append(model)
+            existed_state_list.append(state_list)
 
         # 预测结果
         y_predict = model.predict(x_test)
@@ -239,8 +254,8 @@ if __name__ == '__main__':
     stock = '000905.SH'  # 399300.SZ   000905.SH
     time_steps = 3  # 每次训练的数据长度
     flat_num = 0.4  # (-flat_num, flat_num) 平
-    train_date = '20100101'
-    back_date = '20190301'
+    train_date = '20050101'
+    back_date = '20180601'
 
     quotes = pro.index_daily(ts_code=stock, start_date=train_date).sort_values(by=['trade_date'], ascending=True)
     back_quotes = quotes[quotes['trade_date'] >= back_date].sort_values(by=['trade_date'], ascending=True)
@@ -265,7 +280,7 @@ if __name__ == '__main__':
     ema = ta.EMA(quotes['close'], ema_num).values
     H_line, M_line, L_line = ta.BBANDS(quotes['close'], timeperiod=boll_num, nbdevup=2, nbdevdn=2, matype=0)
 
-    data_list = [ema, H_line, M_line, L_line, close_total, turnover_vol_total]
+    data_list = [H_line - M_line, M_line - L_line, close_total - M_line, close_total, turnover_vol_total]
     data_unscaled = np.column_stack(data_list)[boll_num - 1:]
     data_scaled = scale(X=data_unscaled, axis=0)  # 归一化
 
