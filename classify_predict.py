@@ -251,11 +251,11 @@ if __name__ == '__main__':
     pro = ts.pro_api()
 
     # 参数
-    stock = '000905.SH'  # 399300.SZ   000905.SH
+    stock = '399300.SZ'  # 399300.SZ   000905.SH
     time_steps = 3  # 每次训练的数据长度
     flat_num = 0.4  # (-flat_num, flat_num) 平
-    train_date = '20050101'
-    back_date = '20180601'
+    train_date = '20070101'
+    back_date = '20190301'
 
     quotes = pro.index_daily(ts_code=stock, start_date=train_date).sort_values(by=['trade_date'], ascending=True)
     back_quotes = quotes[quotes['trade_date'] >= back_date].sort_values(by=['trade_date'], ascending=True)
